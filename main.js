@@ -1,9 +1,8 @@
-const { app, BrowserWindow, dialog, ipcMain } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 const chokidar = require('chokidar');
-const trash = require('trash');
 
 let mainWindow = null;
 let watcher = null;
@@ -182,9 +181,11 @@ async function safeDelete(paths, strictHash) {
   }
 
   if (actuallyDelete.length === 0) return { deleted: 0, paths: [] };
-
-  await trash(actuallyDelete, { glob: false });
-  return { deleted: actuallyDelete.length, paths: actuallyDelete };
+  // Use Electron’s native Recycle Bin API (works on Windows)
+  const results = await Promise.allSettled(actuallyDelete.map(p => shell.trashItem(p)));
+  const ok = [];
+  results.forEach((r, i) => { if (r.status === 'fulfilled') ok.push(actuallyDelete[i]); });
+  return { deleted: ok.length, paths: ok };
 }
 
 // ---------- IPC ----------
