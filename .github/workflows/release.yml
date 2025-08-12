@@ -34,7 +34,16 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '18'
-          cache: 'npm'
+          # cache: 'npm'                         # ← Re-enable after committing a lockfile
+          # cache-dependency-path: package-lock.json
+
+      - name: Ensure package-lock.json exists (CI fallback)
+        shell: bash
+        run: |
+          if [ ! -f package-lock.json ]; then
+            echo "No lockfile found — generating package-lock.json"
+            npm install --package-lock-only
+          fi
 
       - name: Sync version from tag (vX.Y.Z → package.json)
         env:
@@ -46,13 +55,18 @@ jobs:
           if(v){p.version=v; fs.writeFileSync('package.json', JSON.stringify(p,null,2)+'');
           console.log('Synced package.json version →', v);} else {console.log('No tag version parsed; keeping', p.version);}"
 
-      - name: Install deps
-        run: npm ci
+      - name: Install dependencies
+        shell: bash
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
 
       - name: Build
         run: ${{ matrix.build_cmd }}
         env:
-          # Enables some CI-aware behaviors; not strictly required
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload artifacts (for debugging / reuse)
@@ -72,6 +86,7 @@ jobs:
           path: dist
 
       - name: Publish tag release
+        id: gh_release
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
@@ -82,3 +97,20 @@ jobs:
           prerelease: ${{ contains(github.ref_name, '-rc') || contains(github.ref_name, '-beta') || contains(github.ref_name, '-alpha') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Add direct download links to job summary
+        shell: bash
+        env:
+          REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+          RELEASE_URL: ${{ steps.gh_release.outputs.html_url }}
+        run: |
+          echo "## ✅ Build complete" >> "$GITHUB_STEP_SUMMARY"
+          echo "Release: ${RELEASE_URL}" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "### Downloads" >> "$GITHUB_STEP_SUMMARY"
+          find dist -type f -maxdepth 2 | while read -r f; do
+            base=$(basename "$f")
+            url="https://github.com/${REPO}/releases/download/${TAG}/${base}"
+            echo "- [${base}](${url})" >> "$GITHUB_STEP_SUMMARY"
+          done
