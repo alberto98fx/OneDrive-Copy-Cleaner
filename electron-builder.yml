@@ -1,0 +1,14 @@
+appId: com.example.onedrivecopycleaner
+productName: OneDrive Copy Cleaner
+files:
+  - "**/*"
+win:
+  target:
+    - portable
+  artifactName: "${productName}-Portable-${version}.exe"
+mac:
+  category: public.app-category.utilities
+  artifactName: "${productName}-${version}.${ext}"
+asar: true
+directories:
+  output: dist

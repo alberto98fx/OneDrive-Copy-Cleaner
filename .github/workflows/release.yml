@@ -1,0 +1,84 @@
+name: Release on tag
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write  # needed to create/upload GitHub Releases
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build binaries
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            build_cmd: npm run build:win
+            artifact_glob: dist/*Portable*.exe
+          - os: macos-latest
+            build_cmd: npm run build:mac
+            artifact_glob: dist/*.dmg
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Sync version from tag (vX.Y.Z → package.json)
+        env:
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+        run: >-
+          node -e "const fs=require('fs');
+          const p=require('./package.json');
+          const tag=process.env.GITHUB_REF_NAME||''; const v=tag.replace(/^v/,'');
+          if(v){p.version=v; fs.writeFileSync('package.json', JSON.stringify(p,null,2)+'');
+          console.log('Synced package.json version →', v);} else {console.log('No tag version parsed; keeping', p.version);}"
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Build
+        run: ${{ matrix.build_cmd }}
+        env:
+          # Enables some CI-aware behaviors; not strictly required
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload artifacts (for debugging / reuse)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ runner.os }}-artifacts
+          path: ${{ matrix.artifact_glob }}
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Publish tag release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            dist/**/*
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-rc') || contains(github.ref_name, '-beta') || contains(github.ref_name, '-alpha') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

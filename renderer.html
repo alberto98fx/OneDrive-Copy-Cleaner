@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' file: data:; style-src 'self' 'unsafe-inline';" />
+  <title>OneDrive Copy Cleaner</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <h1>OneDrive Copy Cleaner</h1>
+    <div class="controls">
+      <button id="selectRootBtn">Select Root Folder…</button>
+      <span id="rootPath" class="muted"></span>
+      <label class="toggle"><input type="checkbox" id="strictHashChk" /> Strict hash match (safer)</label>
+      <span id="stats" class="muted"></span>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab active" data-tab="copies">Copies</button>
+    <button class="tab" data-tab="folders">Folders</button>
+  </nav>
+
+  <section id="tab-copies" class="tabpane active">
+    <div class="toolbar">
+      <input id="searchInput" placeholder="Filter by filename…" />
+      <button id="deleteSelectedBtn" disabled>Delete selected…</button>
+      <span id="selectedStats" class="muted"></span>
+    </div>
+    <div id="grid" class="grid"></div>
+  </section>
+
+  <section id="tab-folders" class="tabpane">
+    <div class="folderpane">
+      <div id="folderTree" class="tree"></div>
+      <div class="folder-actions">
+        <div>Selected folder: <span id="currentFolder" class="muted">(none)</span></div>
+        <button id="deleteFolderBtn" disabled>Delete ALL copies in this folder…</button>
+      </div>
+    </div>
+  </section>
+
+  <template id="cardTemplate">
+    <div class="card">
+      <div class="thumbwrap"><img class="thumb" /></div>
+      <div class="meta">
+        <label><input type="checkbox" class="sel" /> <span class="fname"></span></label>
+        <div class="sub meta-row">
+          <span class="size"></span>
+          <span class="orig"></span>
+          <span class="hash"></span>
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <script src="renderer.js"></script>
+</body>
+</html>
